@@ -19,7 +19,7 @@ import tldextract
 # domains that aren't scraper friendly. do not include subdomains!
 exclude_domains = set([
 
-    # image & video hosting sites
+    # image, video, and music hosting sites
     'imgur.com',
     'redd.it',
     'gfycat.com',
@@ -40,6 +40,11 @@ exclude_domains = set([
     'bandcamp.com',
     'soundcloud.com',
     'video.google.com',
+    'instagram.com',
+    'deviantart.com',
+    'itunes.apple.com',
+    'pornhub.com',
+    'pinterest.com',
 
     # not scraper friendly
     'reddit.com',
@@ -48,7 +53,6 @@ exclude_domains = set([
     'xkcd.com',
     'twitter.com',
     'spotify.com',
-    'itunes.apple.com',
     'facebook.com',
     'gunprime.com',
     'strawpoll.me',
@@ -59,6 +63,7 @@ exclude_domains = set([
     'walmart.com',
     'roanoke.com',
     'spotrac.com',
+    'discord.gg',
 
     # other non-text content
     'ebay.com',

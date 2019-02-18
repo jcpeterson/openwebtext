@@ -1,4 +1,5 @@
 import os, sys, json, argparse
+from collections import Counter
 
 from utils import *
 
@@ -24,6 +25,7 @@ good_links = []
 for fn in filenames:
     
     hit_count = 0
+    total_count = 0
 
     path = os.path.join(args.psdir, fn)
     decompress = get_decompresser(fn)
@@ -32,6 +34,7 @@ for fn in filenames:
         with open(fn+'.goodlinks.txt', 'w') as outfile:
 
             for line in psfile:
+
                 j = json.loads(line)
 
                 # only take the good links
@@ -43,6 +46,9 @@ for fn in filenames:
 
                     hit_count += 1
                     if hit_count % 10000==0:
-                        print(hit_count)
+                        print(hit_count, total_count, hit_count/float(total_count))
                         outfile.flush()
                         os.system('xz -zkf '+fn+'.goodlinks.txt')
+                total_count += 1
+
+print(hit_count, total_count, hit_count/float(total_count))
