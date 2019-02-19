@@ -140,7 +140,14 @@ def is_bad_url(url):
        domain in exclude_domains:
         return True
 
+    # first full URL extraction used:
     if url.split('?')[0].endswith(exclude_extensions):
         return True
+
+    # need to re-extract using:
+    # if url.split('?')[0].lower().endswith(exclude_extensions):
+
+    # note: some lower case 'jpg' links etc are still getting through
+    # splitting above probably isn't enough
 
     return False
