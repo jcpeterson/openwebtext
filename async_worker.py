@@ -17,7 +17,7 @@ parser.add_argument('--url_file', type=str)
 parser.add_argument('--num_urls', type=int, default=1000)
 args = parser.parse_args()
 
-session = AsyncSession(n=10)
+session = AsyncSession(n=100)
 
 url_table = pd.read_table(args.url_file).tail(args.num_urls) 	
 url_table.columns =['url']
@@ -71,7 +71,7 @@ def main(reactor):
     t1 = time.time()
     responses = []
     for record in url_table.to_records('dict'):
-        responses.append(session.get(record['url'], verify=False))
+        responses.append(session.get(record['url'], verify=False, timeout=5))
         
 
     for response in responses:
