@@ -71,9 +71,7 @@ def main(reactor):
     t1 = time.time()
     responses = []
     for record in url_table.to_records('dict'):
-    	with warnings.catch_warnings():  
-            warnings.filterwarnings("ignore")       
-            responses.append(session.get(record['url'], verify=False))
+        responses.append(session.get(record['url'], verify=False))
         
 
     for response in responses:
