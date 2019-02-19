@@ -26,7 +26,10 @@ if args.single_file is None:
           filenames)
 else:
     # args.single_file overrides the year range
-    filenames.append(args.single_file) 
+    filenames.append(args.single_file)
+
+if not os.path.exists(args.outdir):
+    os.makedirs(args.outdir)
 
 # extract all good links and save
 good_links = []

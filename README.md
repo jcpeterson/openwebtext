@@ -6,6 +6,27 @@ Currently, only the 3+ karma links (14 million from 2016-2018 posts) are availab
 Original OpenAI project links:
 * Blog Post [(Better Language Models and Their Implications)](https://blog.openai.com/better-language-models/)
 * Paper [(Language Models are Unsupervised Multitask Learners)](https://d4mucfpksywv.cloudfront.net/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
-* Code [(https://github.com/openai/gpt-2)](https://github.com/openai/gpt-2).
+* Code [(https://github.com/openai/gpt-2)](https://github.com/openai/gpt-2)
 
 An alternative scraper based on the pushshift.io API can be found [here](https://github.com/eukaryote31/openwebtext)
+
+### Dependencies
+```
+pip install tldextract
+```
+
+### To Scrape URLs Yourself
+Pushshift dumps must be downloaded from [here](https://files.pushshift.io/reddit/submissions/) (auto-downloader to be added soon). Two examples are included in the repo in the "pushshift_dumps" folder. Then, extract good URLs using:
+```
+python extract_urls.py --single_file RS_v2_2005-06.xz
+```
+To process multiple pushshift files, specify year ranges:
+```
+python extract_urls.py --year_start 2016 --year_end 2018
+```
+To change the karma threshold:
+```
+python extract_urls.py --single_file RS_v2_2005-06.xz --min_karma 4
+```
+
+
