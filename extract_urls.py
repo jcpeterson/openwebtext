@@ -9,7 +9,7 @@ parser.add_argument('--year_start', type=int, default=2018)
 parser.add_argument('--year_end', type=int, default=2018)
 parser.add_argument('--single_file', type=str, default=None)
 parser.add_argument('--min_karma', type=int, default=3)
-parser.add_argument('--dont_compress', action='store_true', default=False)
+parser.add_argument('--compress', action='store_true', default=False)
 args = parser.parse_args()
 
 # for processing many pushshift dumps at once
@@ -66,7 +66,7 @@ for fn in filenames:
                 total_count += 1
 
 # save a compressed version too
-if not args.dont_compress:
+if args.compress:
     os.system('xz -zkf '+out_path)
 
 print(hit_count, total_count, hit_count/float(total_count))
