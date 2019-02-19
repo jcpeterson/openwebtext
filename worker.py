@@ -95,6 +95,9 @@ if __name__ == '__main__':
 
 	total_transferred = np.nansum(metadata_df['size'])
 	print('Total transferred: '+str(np.round(total_transferred, 3))+' MB')	
+
+	total_words = np.nansum(metadata_df['count'])
+	print('Total tokens: '+str(np.round(total_words, 3))+' tokens')	
 		
 	print('Status Code count')
 	metadata_df['status'].value_counts()
