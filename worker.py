@@ -9,6 +9,7 @@ import pandas as pd
 import argparse
 import pickle
 import numpy as np
+import unicodedata
 # read the input file list
 
 parser = argparse.ArgumentParser()
@@ -21,7 +22,14 @@ def scrape(url):
 	''' main request and status code handling'''
 	t1 = time.time()
 	metadata = {'url': url}
-	result = requests.get(url, timeout=2)
+	try:
+		result = requests.get(url, timeout=5)
+	except:
+		print('Timeout!')
+		metadata['status'] = 'timeout'
+		text = {}		
+		return(metadata, text)
+
 	metadata['status'] = result.status_code
 	print(result.status_code)
 
@@ -31,33 +39,36 @@ def scrape(url):
 		soup = bs4.BeautifulSoup(result.content, 'lxml')	
 		
 		text = {}
-		text['p'] = getAndFilterTag('p', soup)		
+		text['p'], p_count = findAndFilterTag('p', soup)		
 	else:
 		text = {}
+		p_count = 0
 
+	metadata['count'] = np.sum(p_count)
 	metadata['elapsed'] = time.time() - t1
 	#print(rdf)
 	return(metadata, text)
 
 
-def getAndFilterTag(tag, soup):
+def findAndFilterTag(tag, soup):
 	'''tag specific filter logic'''
 
 	candidates = soup.find_all(tag)
-	candidates = [x.string for x in candidates if x.string is not None]
+	candidates = [unicodedata.normalize("NFKD", x.string) for x in candidates if x.string is not None]
 
 	if tag == 'p':
 		candidates = [y.strip() for y in candidates if len(y.split(' ')) >= 4]
+		count = np.sum(len(y.split(' ')) for y in candidates) 
 	else:
 		raise NotImplementedError
 
-	return(candidates)
+	return(candidates, count)
 
 
 
 if __name__ == '__main__':
 
-	url_table = pd.read_table(args.url_file).head(args.num_urls) 	
+	url_table = pd.read_table(args.url_file).tail(args.num_urls) 	
 	url_table.columns =['url']
 	url_table['retrieval_index'] = range(url_table.shape[0])
 
@@ -86,7 +97,7 @@ if __name__ == '__main__':
 	print('Total transferred: '+str(np.round(total_transferred, 3))+' MB')	
 		
 	print('Status Code count')
-	codes =  metadata_df['status'].value_counts()
+	metadata_df['status'].value_counts()
 
 	import pdb
 	pdb.set_trace()	
@@ -95,4 +106,4 @@ if __name__ == '__main__':
 #[X] estimate the size of the html
 #[X] get the total duration 
 #[ ] could add a word count
-# \xa0, \ and text encoding
+#[X]  \xa0, \ and text encoding
