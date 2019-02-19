@@ -1,4 +1,5 @@
 import bz2
+
 try:                # python3
     import lzma
 except ImportError: # python2
@@ -8,7 +9,10 @@ def get_decompresser(fn):
     if '.bz2' in fn:
         decompress = bz2.BZ2File
     elif '.xz' in fn:
-        decompress =  lzma.open
+        decompress = lzma.open
+    elif '.zst' in fn:
+        print('zst not implemented yet!')
+        exit()
     return decompress
 
 # the below is adapted from:
@@ -45,6 +49,10 @@ exclude_domains = set([
     'itunes.apple.com',
     'pornhub.com',
     'pinterest.com',
+    'twimg.com', # twitter images
+    'erome.com',
+    'magaimg.net',
+
 
     # not scraper friendly
     'reddit.com',
@@ -65,8 +73,14 @@ exclude_domains = set([
     'spotrac.com',
     'discord.gg',
 
-    # other non-text content
+    # product websites
     'ebay.com',
+    'hotdealstar.com',
+    'edealinfo.com',
+
+    # software repos
+    'aapks.com',
+    'dlapkandroid.org',
 
     # remove these?
     # 'reverb.com',
