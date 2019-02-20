@@ -12,6 +12,7 @@ parser.add_argument("--n_threads", type=int, default=1)
 parser.add_argument("--max_urls", type=int, default=-1)
 parser.add_argument("--chunk_size", type=int, default=100)
 parser.add_argument("--scraper", type=str, default="newspaper")
+parser.add_argument("--compress", action='store_true', default=False)
 args = parser.parse_args()
 
 def init_output_dirs(output_dir):
@@ -29,7 +30,7 @@ def init_output_dirs(output_dir):
         os.makedirs(data_path)
     if not os.path.exists(meta_path):
         os.makedirs(meta_path)
-    return chunk_path, data_path, meta_path
+    return chunk_dir, chunk_path, data_path, meta_path
 
 def get_completed_fids(data_path, meta_path):
     parsed_fid, meta_fid = set(), set()
@@ -109,7 +110,7 @@ def download(url_entry,
 if __name__ == "__main__":
 
     if args.save_output:
-        chunk_path, data_path, meta_path = init_output_dirs(args.output_dir)
+        chunk_dir, chunk_path, data_path, meta_path = init_output_dirs(args.output_dir)
 
     completed_fids = get_completed_fids(data_path, meta_path)
     url_entries = load_urls(completed_fids)
@@ -133,9 +134,17 @@ if __name__ == "__main__":
         #     # problem links return None instead of content
         #     if result != None:
         #         scraped.append(result)
-        data = list(p.imap(download, url_entries))
+        data = list(p.imap(download, chunk))
 
         total_time = time.time() - t1
 
         print("Chunk time: ", str(total_time), " seconds", '\n')
+
+    # save xz file to massively reduce file size
+    # this will take a long time for recent reddit months
+    if args.compress:
+        print('Compressing...')
+        out_arch = join('../', '../', chunk_dir+'.xz')
+        os.system('cd ' + data_path + ' && tar cfJ ' + out_arch + ' *.txt')
+
     print("Done!")
