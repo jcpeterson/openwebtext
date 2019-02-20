@@ -115,7 +115,6 @@ if __name__ == "__main__":
         # problem links return None instead of content
         if result != None:
             data.append(result)
-            print(result)
 
     total_time = time.time() - t1
 
