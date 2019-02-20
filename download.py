@@ -68,10 +68,10 @@ def download(url_entry, scraper=args.scraper,
     uid, url = url_entry
     url = url.strip()
     
-    is_good_link, link_type = vet_link(url)
+    # is_good_link, link_type = vet_link(url)
 
-    if not is_good_link:
-        return
+    # if not is_good_link:
+    #     return
 
     # choose scraper and scrape
     if scraper == "bs4":
@@ -115,8 +115,9 @@ if __name__ == "__main__":
         # problem links return None instead of content
         if result != None:
             data.append(result)
+            print(result)
 
     total_time = time.time() - t1
 
-    print("Total time: ", str(int(total_time)), " seconds")
+    print("Total time: ", str(total_time), " seconds")
     print("Done!")
