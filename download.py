@@ -1,33 +1,41 @@
-import os, argparse, time, json, glob
-import mimetypes
+import os, argparse, time, json, glob, copy
+from os.path import join
 import multiprocessing as mp
-
-# for backward compatibility
-# from six.moves.urllib.request import urlopen
 
 from scrapers import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("url_file", type=str)
 parser.add_argument("--save_output", action='store_true', default=False)
+parser.add_argument("--output_dir", type=str, default="scraped")
 parser.add_argument("--n_threads", type=int, default=1)
 parser.add_argument("--max_urls", type=int, default=-1)
+parser.add_argument("--chunk_size", type=int, default=100)
 parser.add_argument("--scraper", type=str, default="newspaper")
 args = parser.parse_args()
 
-def init_output_dirs():
-    # create 'data/parsed' etc...
-    subdirs = ['parsed','meta']
-    for subdir in subdirs:
-        path = os.path.join('data', subdir)
-        if not os.path.exists(path):
-            os.makedirs(path)
+def init_output_dirs(output_dir):
+    s = copy.deepcopy(os.path.basename(args.url_file))
+    if '.bz2' in s:
+        chunk_dir = s[:s.find('.bz2')]
+    elif '.xz' in s:
+        chunk_dir = s[:s.find('.xz')]
+    else:
+        chunk_dir = s
+    chunk_path = os.path.join(output_dir, chunk_dir)
+    data_path = os.path.join(chunk_path, 'data')
+    meta_path = os.path.join(chunk_path, 'meta')
+    if not os.path.exists(data_path):
+        os.makedirs(data_path)
+    if not os.path.exists(meta_path):
+        os.makedirs(meta_path)
+    return chunk_path, data_path, meta_path
 
-def get_completed_fids():
+def get_completed_fids(data_path, meta_path):
     parsed_fid, meta_fid = set(), set()
-    for ff in glob.glob("data/parsed/*.txt"):
+    for ff in glob.glob(join(data_path, '*.txt')):
         parsed_fid.add(int(os.path.split(ff)[-1].split("-")[0]))
-    for ff in glob.glob("data/meta/*.json"):
+    for ff in glob.glob(join(meta_path, '*.json')):
         meta_fid.add(int(os.path.split(ff)[-1].split("-")[0]))
     return parsed_fid.intersection(meta_fid)
 
@@ -62,7 +70,8 @@ def vet_link(link):
 
     return is_good_link, link_type
 
-def download(url_entry, scraper=args.scraper, 
+def download(url_entry, 
+             scraper=args.scraper, 
              save_output=args.save_output):
 
     uid, url = url_entry
@@ -87,8 +96,8 @@ def download(url_entry, scraper=args.scraper,
 
     if args.save_output:
         fid = "{:07d}-{}".format(uid, hash(url.encode()))
-        parsed_fp = "data/parsed/{}.txt".format(fid)
-        meta_fp = "data/meta/{}.json".format(fid)
+        parsed_fp = join(data_path, "{}.txt".format(fid))
+        meta_fp = join(meta_path, "{}.json".format(fid))
 
         with open(parsed_fp, "w") as out:
             out.write(text)
@@ -98,25 +107,35 @@ def download(url_entry, scraper=args.scraper,
     return text
 
 if __name__ == "__main__":
+
     if args.save_output:
-        init_output_dirs()
-    completed_fids = get_completed_fids()
+        chunk_path, data_path, meta_path = init_output_dirs(args.output_dir)
+
+    completed_fids = get_completed_fids(data_path, meta_path)
     url_entries = load_urls(completed_fids)
 
-    # set up worker pool
-    p = mp.Pool(args.n_threads)
+    def chunks(l, n):
+        """Yield successive n-sized chunks from l."""
+        for i in range(0, len(l), n):
+            yield l[i:i + n]
 
-    print("Downloading...")
-    t1 = time.time()
+    for c, chunk in enumerate(chunks(url_entries, args.chunk_size)):
+        
+        # set up worker pool
+        p = mp.Pool(args.n_threads)
 
-    # iterating will be needed to dump larger files later
-    data = []
-    for result in p.imap(download, url_entries):
-        # problem links return None instead of content
-        if result != None:
-            data.append(result)
+        print("Downloading chunk {}".format(c+1))
+        t1 = time.time()
 
-    total_time = time.time() - t1
+        # # iterating will be needed to dump larger files later
+        # scraped = []
+        # for result in p.imap(download, url_entries):
+        #     # problem links return None instead of content
+        #     if result != None:
+        #         scraped.append(result)
+        data = list(p.imap(download, url_entries))
 
-    print("Total time: ", str(total_time), " seconds")
+        total_time = time.time() - t1
+
+        print("Chunk time: ", str(total_time), " seconds", '\n')
     print("Done!")

@@ -30,14 +30,14 @@ def raw_scraper(url):
         cleaner = Cleaner()
         cleaner.javascript = True
         cleaner.style = True
-        article = newspaper.Article(url)
+        article = newspaper.Article(url, fetch_images=False)
         article.download()
-        article.parse()
         html = minify(article.html)
         html = cleaner.clean_html(html)
+        article.parse()
     except:
         return None, None
-    if article.html == '':
+    if article.text == '':
         return None, None
 
     metadata = {
@@ -51,7 +51,7 @@ def newspaper_scraper(url):
     t1 = time.time()
 
     try:
-        article = newspaper.Article(url)
+        article = newspaper.Article(url, fetch_images=False)
         article.download()
         article.parse()
         text = article.text
@@ -84,7 +84,7 @@ def bs4_scraper(url):
     #     return None, None
 
     try:
-        article = newspaper.Article(url)
+        article = newspaper.Article(url, fetch_images=False)
         article.download()
         html = article.html
         size = len(html) / 1000.0 / 1000.0
