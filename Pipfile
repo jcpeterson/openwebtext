@@ -12,6 +12,7 @@ beautifulsoup4 = "*"
 lxml = "*"
 tldextract = "*"
 newspaper3k = "*"
+htmlmin = "*"
 
 [requires]
 python_version = "3.7"
