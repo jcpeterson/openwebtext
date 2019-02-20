@@ -17,7 +17,7 @@ args = parser.parse_args()
 
 def init_output_dirs():
     # create 'data/parsed' etc...
-    subdirs = ['parsed','raw','meta']
+    subdirs = ['parsed','meta']
     for subdir in subdirs:
         path = os.path.join('data', subdir)
         if not os.path.exists(path):
@@ -62,26 +62,6 @@ def vet_link(link):
 
     return is_good_link, link_type
 
-def newspaper_scraper(url):
-    t1 = time.time()
-
-    try:
-        article = newspaper.Article(url)
-        article.download()
-        article.parse()
-        text = article.text
-        count = len(text.split())
-    except: #newspaper.article.ArticleException:
-        return None, None
-
-    metadata = {
-        "url": url,
-        "word_count": count,
-        "elapsed": time.time() - t1,
-        "scraper": "newspaper",
-    }
-    return text, metadata
-
 def download(url_entry, scraper=args.scraper, 
              save_output=args.save_output):
 
@@ -105,19 +85,21 @@ def download(url_entry, scraper=args.scraper,
     if text is None or text.strip() == "":
         return
 
-    fid = "{:07d}-{}".format(uid, hash(url.encode()))
-    parsed_fp = "data/parsed/{}.txt".format(fid)
-    meta_fp = "data/meta/{}.json".format(fid)
+    if args.save_output:
+        fid = "{:07d}-{}".format(uid, hash(url.encode()))
+        parsed_fp = "data/parsed/{}.txt".format(fid)
+        meta_fp = "data/meta/{}.json".format(fid)
 
-    with open(parsed_fp, "w") as out:
-        out.write(text)
-    with open(meta_fp, "w") as out:
-        json.dump(meta, out)
+        with open(parsed_fp, "w") as out:
+            out.write(text)
+        with open(meta_fp, "w") as out:
+            json.dump(meta, out)
 
     return text
 
 if __name__ == "__main__":
-    init_output_dirs()
+    if args.save_output:
+        init_output_dirs()
     completed_fids = get_completed_fids()
     url_entries = load_urls(completed_fids)
 

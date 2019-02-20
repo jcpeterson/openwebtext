@@ -2,11 +2,25 @@ import time
 # for backward compatibility
 from six.moves.urllib.request import urlopen
 
+import unicodedata
 import bs4
 import newspaper
 import lxml
 from lxml.html.clean import Cleaner
-from async_worker_helper import findAndFilterTag
+
+def findAndFilterTag(tag, soup):
+    '''tag specific filter logic'''
+
+    candidates = soup.find_all(tag)
+    candidates = [unicodedata.normalize("NFKD", x.string) for x in candidates if x.string is not None]
+
+    if tag == 'p':
+        candidates = [y.strip() for y in candidates if len(y.split(' ')) >= 4]
+        count = sum(len(y.split(' ')) for y in candidates) 
+    else:
+        raise NotImplementedError
+
+    return(candidates, count)
 
 def raw_scraper(url):
     t1 = time.time()
@@ -26,24 +40,17 @@ def raw_scraper(url):
     }
     return html, metadata
 
-
 def newspaper_scraper(url):
     t1 = time.time()
 
-    # try:
-    #     article = newspaper.Article(url)
-    #     article.download()
-    #     article.parse()
-    #     text = article.text
-    #     count = len(text.split())
-    # except: #newspaper.article.ArticleException:
-    #     return None, None
-
-    article = newspaper.Article(url)
-    article.download()
-    article.parse()
-    text = article.text
-    count = len(text.split())
+    try:
+        article = newspaper.Article(url)
+        article.download()
+        article.parse()
+        text = article.text
+        count = len(text.split())
+    except: #newspaper.article.ArticleException:
+        return None, None
 
     metadata = {
         "url": url,
