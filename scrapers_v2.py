@@ -34,7 +34,7 @@ def raw_scraper(url):
         cleaner = Cleaner()
         cleaner.javascript = True
         cleaner.style = True
-        article = newspaper.Article(url, fetch_images=False)
+        article = newspaper.Article(url, fetch_images=False, memoize_articles=False)
         article.download()
         html = minify(article.html)
         html = cleaner.clean_html(html)
