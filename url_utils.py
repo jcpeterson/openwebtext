@@ -1,5 +1,4 @@
-    import bz2
-
+import bz2
 try:                # python3
     import lzma
 except ImportError: # python2
