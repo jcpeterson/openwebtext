@@ -1,4 +1,4 @@
-import bz2
+    import bz2
 
 try:                # python3
     import lzma
@@ -52,6 +52,8 @@ exclude_domains = set([
     'twimg.com', # twitter images
     'erome.com',
     'magaimg.net',
+    # after V1 (V2)
+    'flic.kr', # flickr short image urls
 
 
     # not scraper friendly
@@ -129,6 +131,40 @@ exclude_extensions = (
     '.wmv',
     '.3gp',
     '.svg',
+    # V2 run
+    '.swf',
+    '.avi',
+    '.exe',
+    '.css',
+    '.mid',
+    '.midi',
+    '.mpg',
+    '.mpeg',
+    '.mkv',
+    '.qt',
+    '.ram',
+    '.rar',
+    '.tiff',
+    '.txt',
+    '.wav',
+    '.aif',
+    '.ogg',
+    '.aif',
+    '.7z',
+    '.deb',
+    '.tar',
+    '.tar.gz',
+    '.pkg',
+    '.dmg',
+    '.sql',
+    '.jar',
+    '.py',
+    '.otf',
+    '.ttf',
+    '.bmp',
+    '.ai',
+    '.psd',
+    '.js',
 )
 
 def is_bad_url(url):
@@ -140,14 +176,18 @@ def is_bad_url(url):
        domain in exclude_domains:
         return True
 
-    # first full URL extraction used:
-    if url.split('?')[0].endswith(exclude_extensions):
+    # V1 first full URL extraction used:
+    # if url.split('?')[0].endswith(exclude_extensions):
+    #     return True
+    # note: some lower case 'JPG' links still got through
+
+    # V2 include upper extensions
+    if url.split('?')[0].lower().endswith(exclude_extensions):
         return True
 
-    # need to re-extract using:
-    # if url.split('?')[0].lower().endswith(exclude_extensions):
-
-    # note: some lower case 'jpg' links etc are still getting through
-    # splitting above probably isn't enough
+    # V2 first chars are always http:// or https://
+    # need at least three more chars for real url
+    if len(url) < 10:
+        return True
 
     return False
