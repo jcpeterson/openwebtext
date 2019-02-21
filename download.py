@@ -144,7 +144,12 @@ if __name__ == "__main__":
     # this will take a long time for recent reddit months
     if args.compress:
         print('Compressing...')
-        out_arch = join('../', '../', chunk_dir+'.xz')
-        os.system('cd ' + data_path + ' && tar cfJ ' + out_arch + ' *.txt')
+        out_data_arch = join('../', '../', chunk_dir+'_data.xz')
+        out_meta_arch = join('../', '../', chunk_dir+'_meta.xz')
+        t1 = time.time()
+        os.system('cd ' + data_path + ' && tar cfJ ' + out_data_arch + ' *.txt')
+        os.system('cd ' + meta_path + ' && tar cfJ ' + out_meta_arch + ' *.json')
+        total_time = time.time() - t1
+        print("Compression time: ", str(total_time), " seconds")
 
     print("Done!")
