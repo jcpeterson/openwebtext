@@ -25,17 +25,18 @@ parser.add_argument("--chunk_size", type=int, default=100)
 parser.add_argument("--scraper", type=str, default="newspaper")
 parser.add_argument("--compress", action="store_true", default=False)
 parser.add_argument("--compress_fmt", type=str, default="xz")
+parser.add_argument("--scraper_memoize", action="store_true", default=False)
 args = parser.parse_args()
 
 
 def init_output_dirs(url_file, base_dir):
-    cid = op.split(url_file)[-1]
+    month = op.split(url_file)[-1]
     for fmt in [".bz2", ".xz", ".gz"]:
-        cid = cid[: cid.find(fmt)] if fmt in cid else cid
+        month = month[: month.find(fmt)] if fmt in month else month
 
-    data_dir = mkdir(op.join(base_dir, "data", cid))
-    meta_dir = mkdir(op.join(base_dir, "meta", cid))
-    return cid, data_dir, meta_dir
+    data_dir = mkdir(op.join(base_dir, "data", month))
+    meta_dir = mkdir(op.join(base_dir, "meta", month))
+    return month, data_dir, meta_dir
 
 
 def get_completed_fids(data_dir, meta_dir):
@@ -76,7 +77,12 @@ def vet_link(link):
     return is_good_link, link_type
 
 
-def download(url_entry, scraper=args.scraper, save_output=args.save_output):
+def download(
+    url_entry,
+    scraper=args.scraper,
+    save_output=args.save_output,
+    memoize=args.scraper_memoize,
+):
     uid, url = url_entry
     url = url.strip()
 
@@ -95,36 +101,38 @@ def download(url_entry, scraper=args.scraper, save_output=args.save_output):
     if text is None or text.strip() == "":
         return
 
+    text_fp, meta_fp = None, None
     if save_output:
         fid = "{:07d}-{}".format(uid, md5(url.encode()).hexdigest())
-        parsed_fp = op.join(data_dir, "{}.txt".format(fid))
+        text_fp = op.join(data_dir, "{}.txt".format(fid))
         meta_fp = op.join(meta_dir, "{}.json".format(fid))
-        with open(parsed_fp, "w") as out:
+
+        with open(text_fp, "w") as out:
             out.write(text)
         with open(meta_fp, "w") as out:
             json.dump(meta, out)
 
-    return text
+    return (text, text_fp, meta_fp)
 
 
-def create_archive(cid, out_dir, fmt):
+def archive_chunk(month, cid, cdata, out_dir, fmt):
     if fmt not in ["xz", "bz2", "gz"]:
         raise Exception('Compression format must be "xz", "bz2", or "gz"')
 
-    data_dir = op.join(out_dir, "data", cid)
-    meta_dir = op.join(out_dir, "meta", cid)
-    data_tar = op.join(out_dir, "{}_data.{}".format(cid, fmt))
-    meta_tar = op.join(out_dir, "{}_meta.{}".format(cid, fmt))
+    _, text_fps, meta_fps = zip(*cdata)
+    data_dir = op.join(out_dir, "data", month)
+    meta_dir = op.join(out_dir, "meta", month)
+    data_tar = op.join(out_dir, "{}-{}_data.{}".format(month, cid, fmt))
+    meta_tar = op.join(out_dir, "{}-{}_meta.{}".format(month, cid, fmt))
 
-    t1 = time.time()
-    print("Compressing...")
     with tarfile.open(data_tar, "w:" + fmt) as tar:
-        tar.add(data_dir, arcname="{}_data".format(cid))
+        for f in text_fps:
+            tar.add(data_dir, arcname="{}-{}_data".format(month, cid))
 
     with tarfile.open(meta_tar, "w:" + fmt) as tar:
-        tar.add(meta_dir, arcname="{}_meta".format(cid))
+        for f in meta_fps:
+            tar.add(meta_dir, arcname="{}-{}_meta".format(month, cid))
 
-    print("Tarballs created in {} seconds\n".format(time.time() - t1))
     return data_tar, meta_tar
 
 
@@ -156,19 +164,21 @@ if __name__ == "__main__":
     meta_dir, data_dir, = ".", "."
 
     if args.save_output:
-        cid, data_dir, meta_dir = init_output_dirs(args.url_file, args.output_dir)
+        month, data_dir, meta_dir = init_output_dirs(args.url_file, args.output_dir)
         completed_fids = get_completed_fids(data_dir, meta_dir)
 
     url_entries = load_urls(args.url_file, completed_fids, args.max_urls)
-    for c, chunk in enumerate(chunks(url_entries, args.chunk_size)):
-        print("Downloading chunk {}".format(c + 1))
+    for cid, chunk in enumerate(chunks(url_entries, args.chunk_size)):
+        print("Downloading chunk {}".format(cid + 1))
         t1 = time.time()
         p = Pool(args.n_threads)
-        data = list(p.imap(download, chunk))
-        print("Chunk time: {} seconds\n".format(time.time() - t1))
+        cdata = [t for t in list(p.imap(download, chunk)) if isinstance(t, tuple)]
+        print("Chunk time: {} seconds".format(time.time() - t1))
 
-    # this takes a long time for recent reddit months
-    if args.save_output and args.compress:
-        create_archive(cid, args.output_dir, args.compress_fmt)
+        if args.save_output and args.compress:
+            print("Compressing...")
+            t2 = time.time()
+            archive_chunk(month, cid + 1, cdata, args.output_dir, args.compress_fmt)
+            print("Tarballs created in {} seconds\n".format(time.time() - t2))
 
     print("Done!")
