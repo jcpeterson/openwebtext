@@ -11,8 +11,14 @@ Original OpenAI project links:
 An alternative scraper based on the pushshift.io API can be found [here](https://github.com/eukaryote31/openwebtext)
 
 ### Dependencies
+If you use pipenv (`pip install --user pipenv`), cd to the project root and run
 ```
-pip install tldextract
+pipenv install 
+pipenv shell
+```
+Otherwise, just run the following in a new virtual environment
+```
+pip3 install -r requirements.txt
 ```
 
 ### To Scrape URLs Yourself
