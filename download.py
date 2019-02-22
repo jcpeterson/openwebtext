@@ -1,155 +1,195 @@
-import os, argparse, time, json, glob, copy
-from os.path import join
-import multiprocessing as mp
+from __future__ import print_function
 
-from scrapers import *
+import io
+import os
+import time
+import json
+import tarfile
+import argparse
+import os.path as op
+from hashlib import md5
+
+from multiprocessing import Pool
+
+# for backward compatibility
+from six.moves.urllib.request import urlopen
+
+from scrapers_v2 import bs4_scraper, newspaper_scraper, raw_scraper
 
 parser = argparse.ArgumentParser()
 parser.add_argument("url_file", type=str)
-parser.add_argument("--save_output", action='store_true', default=False)
+parser.add_argument("--save_uncompressed", action="store_true", default=False)
 parser.add_argument("--output_dir", type=str, default="scraped")
 parser.add_argument("--n_threads", type=int, default=1)
 parser.add_argument("--max_urls", type=int, default=-1)
 parser.add_argument("--chunk_size", type=int, default=100)
 parser.add_argument("--scraper", type=str, default="newspaper")
-parser.add_argument("--compress", action='store_true', default=False)
+parser.add_argument("--compress", action="store_true", default=False)
+parser.add_argument("--compress_fmt", type=str, default="xz")
+parser.add_argument("--scraper_memoize", action="store_true", default=False)
 args = parser.parse_args()
 
-def init_output_dirs(output_dir):
-    s = copy.deepcopy(os.path.basename(args.url_file))
-    if '.bz2' in s:
-        chunk_dir = s[:s.find('.bz2')]
-    elif '.xz' in s:
-        chunk_dir = s[:s.find('.xz')]
-    else:
-        chunk_dir = s
-    chunk_path = os.path.join(output_dir, chunk_dir)
-    data_path = os.path.join(chunk_path, 'data')
-    meta_path = os.path.join(chunk_path, 'meta')
-    if not os.path.exists(data_path):
-        os.makedirs(data_path)
-    if not os.path.exists(meta_path):
-        os.makedirs(meta_path)
-    return chunk_dir, chunk_path, data_path, meta_path
 
-def get_completed_fids(data_path, meta_path):
-    parsed_fid, meta_fid = set(), set()
-    for ff in glob.glob(join(data_path, '*.txt')):
-        parsed_fid.add(int(os.path.split(ff)[-1].split("-")[0]))
-    for ff in glob.glob(join(meta_path, '*.json')):
-        meta_fid.add(int(os.path.split(ff)[-1].split("-")[0]))
-    return parsed_fid.intersection(meta_fid)
-
-def load_urls(completed_fids):
-    with open(args.url_file) as fh:
+def load_urls(url_file, completed_fids, max_urls=-1):
+    with open(url_file) as fh:
         url_entries = [
             (fid, url) for (fid, url) in enumerate(fh) if fid not in completed_fids
         ]
-        if args.max_urls != -1:
-            url_entries = url_entries[: args.max_urls]
+        if max_urls != -1:
+            url_entries = url_entries[:max_urls]
     return url_entries
 
+
 def vet_link(link):
-    # checks link type and status
-    # returns if a non-200 status code or
-    # the link points to a non-html file
+    # check if server responds with non-200 status code or link points to a
+    # non-html file
+    link_type, link_status = "", -1
     try:
         info = urlopen(link)
         link_type = info.headers["Content-Type"]
         link_status = info.status
     except:
-        link_type = None
+        pass
 
     # we want "text/html" only!
     is_good_link = False
-    try:
-        if ('text/html' in link_type and 
-            link_status == 200):
-            is_good_link = True
-    except:
-        pass
+    if "text/html" in link_type and link_status == 200:
+        is_good_link = True
 
     return is_good_link, link_type
 
-def download(url_entry, 
-             scraper=args.scraper, 
-             save_output=args.save_output):
 
+def download(
+    url_entry,
+    scraper=args.scraper,
+    save_uncompressed=args.save_uncompressed,
+    memoize=args.scraper_memoize,
+):
     uid, url = url_entry
     url = url.strip()
-    
-    # is_good_link, link_type = vet_link(url)
+    fid = "{:07d}-{}".format(uid, md5(url.encode()).hexdigest())
 
+    # is_good_link, link_type = vet_link(url)
     # if not is_good_link:
     #     return
 
-    # choose scraper and scrape
     if scraper == "bs4":
         scrape = bs4_scraper
     elif scraper == "newspaper":
         scrape = newspaper_scraper
     elif scraper == "raw":
         scrape = raw_scraper
-    text, meta = scrape(url)
 
+    text, meta = scrape(url, memoize)
     if text is None or text.strip() == "":
-        return
+        return ("", "", fid, uid)
 
-    if args.save_output:
-        fid = "{:07d}-{}".format(uid, hash(url.encode()))
-        parsed_fp = join(data_path, "{}.txt".format(fid))
-        meta_fp = join(meta_path, "{}.json".format(fid))
+    if save_uncompressed:
+        month = extract_month(args.url_file)
+        data_dir = mkdir(op.join(args.out_dir, "data", month))
+        meta_dir = mkdir(op.join(args.out_dir, "meta", month))
+        text_fp = op.join(data_dir, "{}.txt".format(fid))
+        meta_fp = op.join(meta_dir, "{}.json".format(fid))
 
-        with open(parsed_fp, "w") as out:
+        with open(text_fp, "w") as out:
             out.write(text)
         with open(meta_fp, "w") as out:
             json.dump(meta, out)
 
-    return text
+    return (text, meta, fid, uid)
+
+
+def archive_chunk(month, cid, cdata, out_dir, fmt):
+    if fmt not in ["xz", "bz2", "gz"]:
+        raise Exception('Compression format must be "xz", "bz2", or "gz"')
+
+    mkdir(out_dir)
+    texts, metas, fids, uids = zip(*cdata)
+    data_tar = op.join(out_dir, "{}-{}_data.{}".format(month, cid, fmt))
+    meta_tar = op.join(out_dir, "{}-{}_meta.{}".format(month, cid, fmt))
+    tar_fps, texts, exts = [data_tar, meta_tar], [texts, metas], ["txt", "json"]
+
+    for tar_fp, txts, ext in zip(tar_fps, texts, exts):
+        with tarfile.open(tar_fp, "w:" + fmt) as tar:
+            for f, fid in zip(txts, fids):
+                if f == "":
+                    continue
+
+                if ext == "json":
+                    f = json.dumps(f)
+
+                f = f.encode("utf-8")
+                t = tarfile.TarInfo("{}.{}".format(fid, ext))
+                t.size = len(f)
+                tar.addfile(t, io.BytesIO(f))
+
+    return data_tar, meta_tar
+
+
+#######################################################################
+#                           Util functions                            #
+#######################################################################
+
+
+def extract_archive(archive_fp, outdir="."):
+    with tarfile.open(archive_fp, "r") as tar:
+        tar.extractall(outdir)
+    return outdir
+
+
+def chunks(l, n):
+    """Yield successive n-sized chunks from l."""
+    for i in range(0, len(l), n):
+        yield l[i : i + n]
+
+
+def mkdir(fp):
+    if not op.exists(fp):
+        os.makedirs(fp)
+    return fp
+
+
+def extract_month(url_file):
+    month = op.split(url_file)[-1]
+    for fmt in [".bz2", ".xz", ".gz"]:
+        month = month[: month.find(fmt)] if fmt in month else month
+    return month
+
+
+def get_state(month):
+    mkdir("state")
+    completed_uids = set()
+    state_fp = op.join("state", "{}.txt".format(month))
+    if op.isfile(state_fp):
+        with open(state_fp, "r") as fh:
+            completed_uids = set(int(i.strip()) for i in list(fh))
+    return completed_uids, state_fp
+
+
+def log_state(state_fp, cdata):
+    _, _, _, uids = zip(*cdata)
+    with open(state_fp, "a+") as handle:
+        for uid in uids:
+            handle.write("{}\n".format(uid))
+
 
 if __name__ == "__main__":
+    month = extract_month(args.url_file)
+    completed_uids, state_fp = get_state(month)
+    url_entries = load_urls(args.url_file, completed_uids, args.max_urls)
 
-    if args.save_output:
-        chunk_dir, chunk_path, data_path, meta_path = init_output_dirs(args.output_dir)
-
-    completed_fids = get_completed_fids(data_path, meta_path)
-    url_entries = load_urls(completed_fids)
-
-    def chunks(l, n):
-        """Yield successive n-sized chunks from l."""
-        for i in range(0, len(l), n):
-            yield l[i:i + n]
-
-    for c, chunk in enumerate(chunks(url_entries, args.chunk_size)):
-        
-        # set up worker pool
-        p = mp.Pool(args.n_threads)
-
-        print("Downloading chunk {}".format(c+1))
+    for cid, chunk in enumerate(chunks(url_entries, args.chunk_size)):
+        print("Downloading chunk {}".format(cid + 1))
         t1 = time.time()
+        p = Pool(args.n_threads)
+        cdata = list(p.imap(download, chunk))
+        log_state(state_fp, cdata)
+        print("Chunk time: {} seconds".format(time.time() - t1))
 
-        # # iterating will be needed to dump larger files later
-        # scraped = []
-        # for result in p.imap(download, url_entries):
-        #     # problem links return None instead of content
-        #     if result != None:
-        #         scraped.append(result)
-        data = list(p.imap(download, chunk))
-
-        total_time = time.time() - t1
-
-        print("Chunk time: ", str(total_time), " seconds", '\n')
-
-    # save xz file to massively reduce file size
-    # this will take a long time for recent reddit months
-    if args.compress:
-        print('Compressing...')
-        out_data_arch = join('../', '../', chunk_dir+'_data.xz')
-        out_meta_arch = join('../', '../', chunk_dir+'_meta.xz')
-        t1 = time.time()
-        os.system('cd ' + data_path + ' && tar cfJ ' + out_data_arch + ' *.txt')
-        os.system('cd ' + meta_path + ' && tar cfJ ' + out_meta_arch + ' *.json')
-        total_time = time.time() - t1
-        print("Compression time: ", str(total_time), " seconds")
+        if args.compress:
+            print("Compressing...")
+            t2 = time.time()
+            archive_chunk(month, cid + 1, cdata, args.output_dir, args.compress_fmt)
+            print("Tarballs created in {} seconds\n".format(time.time() - t2))
 
     print("Done!")
