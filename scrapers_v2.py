@@ -27,14 +27,14 @@ def find_and_filter_tag(tag, soup):
     return (candidates, count)
 
 
-def raw_scraper(url):
+def raw_scraper(url, memoize):
     t1 = time.time()
 
     try:
         cleaner = Cleaner()
         cleaner.javascript = True
         cleaner.style = True
-        article = newspaper.Article(url, fetch_images=False, memoize_articles=False)
+        article = newspaper.Article(url, fetch_images=False, memoize_articles=memoize)
         article.download()
         html = minify(article.html)
         html = cleaner.clean_html(html)
@@ -48,11 +48,11 @@ def raw_scraper(url):
     return html, metadata
 
 
-def newspaper_scraper(url):
+def newspaper_scraper(url, memoize):
     t1 = time.time()
 
     try:
-        article = newspaper.Article(url, fetch_images=False, memoize_articles=False)
+        article = newspaper.Article(url, fetch_images=False, memoize_articles=memoize)
         article.download()
         article.parse()
         text = article.text
@@ -69,11 +69,11 @@ def newspaper_scraper(url):
     return text, metadata
 
 
-def bs4_scraper(url):
+def bs4_scraper(url, memoize):
     t1 = time.time()
 
     try:
-        article = newspaper.Article(url, fetch_images=False, memoize_articles=False)
+        article = newspaper.Article(url, fetch_images=False, memoize_articles=memoize)
         article.download()
         html = article.html
         soup = bs4.BeautifulSoup(html, "lxml")
