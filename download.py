@@ -182,11 +182,11 @@ if __name__ == "__main__":
     completed_uids, state_fp, prev_cid = get_state(month, args.output_dir)
     url_entries = load_urls(args.url_file, completed_uids, args.max_urls)
 
+    p = Pool(args.n_threads)
     for i, chunk in enumerate(chunks(url_entries, args.chunk_size)):
         cid = prev_cid + i + 1
         print("Downloading chunk {}".format(cid))
         t1 = time.time()
-        p = Pool(args.n_threads)
         cdata = list(p.imap(download, chunk))
         log_state(state_fp, cdata)
         print("Chunk time: {} seconds".format(time.time() - t1))
