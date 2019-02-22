@@ -7,6 +7,7 @@ import json
 import tarfile
 import argparse
 import os.path as op
+from glob import glob
 from hashlib import md5
 
 from multiprocessing import Pool
@@ -156,14 +157,17 @@ def extract_month(url_file):
     return month
 
 
-def get_state(month):
+def get_state(month, out_dir):
     mkdir("state")
+    latest_cid = 0
     completed_uids = set()
     state_fp = op.join("state", "{}.txt".format(month))
     if op.isfile(state_fp):
+        archives = glob(op.join(out_dir, "{}-*".format(month)))
+        latest_cid = max([int(a.split("-")[-1].split("_")[0]) for a in archives])
         with open(state_fp, "r") as fh:
             completed_uids = set(int(i.strip()) for i in list(fh))
-    return completed_uids, state_fp
+    return completed_uids, state_fp, latest_cid
 
 
 def log_state(state_fp, cdata):
@@ -175,11 +179,12 @@ def log_state(state_fp, cdata):
 
 if __name__ == "__main__":
     month = extract_month(args.url_file)
-    completed_uids, state_fp = get_state(month)
+    completed_uids, state_fp, prev_cid = get_state(month, args.output_dir)
     url_entries = load_urls(args.url_file, completed_uids, args.max_urls)
 
-    for cid, chunk in enumerate(chunks(url_entries, args.chunk_size)):
-        print("Downloading chunk {}".format(cid + 1))
+    for i, chunk in enumerate(chunks(url_entries, args.chunk_size)):
+        cid = prev_cid + i + 1
+        print("Downloading chunk {}".format(cid))
         t1 = time.time()
         p = Pool(args.n_threads)
         cdata = list(p.imap(download, chunk))
@@ -189,7 +194,7 @@ if __name__ == "__main__":
         if args.compress:
             print("Compressing...")
             t2 = time.time()
-            archive_chunk(month, cid + 1, cdata, args.output_dir, args.compress_fmt)
+            archive_chunk(month, cid, cdata, args.output_dir, args.compress_fmt)
             print("Tarballs created in {} seconds\n".format(time.time() - t2))
 
     print("Done!")
