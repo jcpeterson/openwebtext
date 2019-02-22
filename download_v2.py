@@ -1,11 +1,12 @@
 from __future__ import print_function
+
+import io
 import os
-import argparse
 import time
 import json
-import os.path as op
 import tarfile
-from glob import glob
+import argparse
+import os.path as op
 from hashlib import md5
 
 from multiprocessing import Pool
@@ -17,7 +18,7 @@ from scrapers_v2 import bs4_scraper, newspaper_scraper, raw_scraper
 
 parser = argparse.ArgumentParser()
 parser.add_argument("url_file", type=str)
-parser.add_argument("--save_output", action="store_true", default=False)
+parser.add_argument("--save_uncompressed", action="store_true", default=False)
 parser.add_argument("--output_dir", type=str, default="scraped")
 parser.add_argument("--n_threads", type=int, default=1)
 parser.add_argument("--max_urls", type=int, default=-1)
@@ -27,25 +28,6 @@ parser.add_argument("--compress", action="store_true", default=False)
 parser.add_argument("--compress_fmt", type=str, default="xz")
 parser.add_argument("--scraper_memoize", action="store_true", default=False)
 args = parser.parse_args()
-
-
-def init_output_dirs(url_file, base_dir):
-    month = op.split(url_file)[-1]
-    for fmt in [".bz2", ".xz", ".gz"]:
-        month = month[: month.find(fmt)] if fmt in month else month
-
-    data_dir = mkdir(op.join(base_dir, "data", month))
-    meta_dir = mkdir(op.join(base_dir, "meta", month))
-    return month, data_dir, meta_dir
-
-
-def get_completed_fids(data_dir, meta_dir):
-    parsed_fid, meta_fid = set(), set()
-    for ff in glob(op.join(data_dir, "*.txt")):
-        parsed_fid.add(int(op.split(ff)[-1].split("-")[0]))
-    for ff in glob(op.join(meta_dir, "*.json")):
-        meta_fid.add(int(op.split(ff)[-1].split("-")[0]))
-    return parsed_fid.intersection(meta_fid)
 
 
 def load_urls(url_file, completed_fids, max_urls=-1):
@@ -80,11 +62,12 @@ def vet_link(link):
 def download(
     url_entry,
     scraper=args.scraper,
-    save_output=args.save_output,
+    save_uncompressed=args.save_uncompressed,
     memoize=args.scraper_memoize,
 ):
     uid, url = url_entry
     url = url.strip()
+    fid = "{:07d}-{}".format(uid, md5(url.encode()).hexdigest())
 
     # is_good_link, link_type = vet_link(url)
     # if not is_good_link:
@@ -99,11 +82,12 @@ def download(
 
     text, meta = scrape(url, memoize)
     if text is None or text.strip() == "":
-        return
+        return ("", "", fid, uid)
 
-    text_fp, meta_fp = None, None
-    if save_output:
-        fid = "{:07d}-{}".format(uid, md5(url.encode()).hexdigest())
+    if save_uncompressed:
+        month = extract_month(args.url_file)
+        data_dir = mkdir(op.join(args.out_dir, "data", month))
+        meta_dir = mkdir(op.join(args.out_dir, "meta", month))
         text_fp = op.join(data_dir, "{}.txt".format(fid))
         meta_fp = op.join(meta_dir, "{}.json".format(fid))
 
@@ -112,26 +96,32 @@ def download(
         with open(meta_fp, "w") as out:
             json.dump(meta, out)
 
-    return (text, text_fp, meta_fp)
+    return (text, meta, fid, uid)
 
 
 def archive_chunk(month, cid, cdata, out_dir, fmt):
     if fmt not in ["xz", "bz2", "gz"]:
         raise Exception('Compression format must be "xz", "bz2", or "gz"')
 
-    _, text_fps, meta_fps = zip(*cdata)
-    data_dir = op.join(out_dir, "data", month)
-    meta_dir = op.join(out_dir, "meta", month)
+    mkdir(out_dir)
+    text, meta, fid, uid = zip(*cdata)
     data_tar = op.join(out_dir, "{}-{}_data.{}".format(month, cid, fmt))
     meta_tar = op.join(out_dir, "{}-{}_meta.{}".format(month, cid, fmt))
+    tar_fps, texts, exts = [data_tar, meta_tar], [text, meta], ["txt", "json"]
 
-    with tarfile.open(data_tar, "w:" + fmt) as tar:
-        for f in text_fps:
-            tar.add(data_dir, arcname="{}-{}_data".format(month, cid))
+    for tar_fp, txts, ext in zip(tar_fps, texts, exts):
+        with tarfile.open(tar_fp, "w:" + fmt) as tar:
+            for f in txts:
+                if f == "":
+                    continue
 
-    with tarfile.open(meta_tar, "w:" + fmt) as tar:
-        for f in meta_fps:
-            tar.add(meta_dir, arcname="{}-{}_meta".format(month, cid))
+                if ext == "json":
+                    f = json.dumps(f)
+
+                f = f.encode("utf-8")
+                t = tarfile.TarInfo("{}.{}".format(fid, ext))
+                t.size = len(f)
+                tar.addfile(t, io.BytesIO(f))
 
     return data_tar, meta_tar
 
@@ -159,23 +149,44 @@ def mkdir(fp):
     return fp
 
 
+def extract_month(url_file):
+    month = op.split(url_file)[-1]
+    for fmt in [".bz2", ".xz", ".gz"]:
+        month = month[: month.find(fmt)] if fmt in month else month
+    return month
+
+
+def get_state(month):
+    mkdir("state")
+    completed_uids = set()
+    state_fp = op.join("state", "{}.txt".format(month))
+    if op.isfile(state_fp):
+        with open(state_fp, "r") as fh:
+            completed_uids = set(int(i).strip() for i in list(fh))
+    return completed_uids, state_fp
+
+
+def log_state(state_fp, cdata):
+    _, _, _, uids = zip(*cdata)
+    with open(state_fp, "a+") as handle:
+        for uid in uids:
+            handle.write("{}\n".format(uid))
+
+
 if __name__ == "__main__":
-    completed_fids = set()
-    meta_dir, data_dir, = ".", "."
+    month = extract_month(args.url_file)
+    completed_uids, state_fp = get_state(month)
+    url_entries = load_urls(args.url_file, completed_uids, args.max_urls)
 
-    if args.save_output:
-        month, data_dir, meta_dir = init_output_dirs(args.url_file, args.output_dir)
-        completed_fids = get_completed_fids(data_dir, meta_dir)
-
-    url_entries = load_urls(args.url_file, completed_fids, args.max_urls)
     for cid, chunk in enumerate(chunks(url_entries, args.chunk_size)):
         print("Downloading chunk {}".format(cid + 1))
         t1 = time.time()
         p = Pool(args.n_threads)
-        cdata = [t for t in list(p.imap(download, chunk)) if isinstance(t, tuple)]
+        cdata = list(p.imap(download, chunk))
+        log_state(state_fp, cdata)
         print("Chunk time: {} seconds".format(time.time() - t1))
 
-        if args.save_output and args.compress:
+        if args.compress:
             print("Compressing...")
             t2 = time.time()
             archive_chunk(month, cid + 1, cdata, args.output_dir, args.compress_fmt)
