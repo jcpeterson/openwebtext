@@ -73,7 +73,7 @@ def bs4_scraper(url):
     t1 = time.time()
 
     try:
-        article = newspaper.Article(url, fetch_images=False)
+        article = newspaper.Article(url, fetch_images=False, memoize_articles=False)
         article.download()
         html = article.html
         soup = bs4.BeautifulSoup(html, "lxml")
