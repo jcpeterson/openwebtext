@@ -13,6 +13,7 @@ lxml = "*"
 tldextract = "*"
 newspaper3k = "*"
 htmlmin = "*"
+urlparse2 = "*"
 
 [requires]
 python_version = "3.7"
