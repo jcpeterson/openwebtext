@@ -162,7 +162,7 @@ def get_state(month):
     state_fp = op.join("state", "{}.txt".format(month))
     if op.isfile(state_fp):
         with open(state_fp, "r") as fh:
-            completed_uids = set(int(i).strip() for i in list(fh))
+            completed_uids = set(int(i.strip()) for i in list(fh))
     return completed_uids, state_fp
 
 
