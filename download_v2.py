@@ -35,7 +35,6 @@ def init_output_dirs(url_file, base_dir):
 
     data_dir = mkdir(op.join(base_dir, "data", cid))
     meta_dir = mkdir(op.join(base_dir, "meta", cid))
-    mkdir(op.join(base_dir, "archive"))
     return cid, data_dir, meta_dir
 
 
@@ -114,8 +113,8 @@ def create_archive(cid, out_dir, fmt):
 
     data_dir = op.join(out_dir, "data", cid)
     meta_dir = op.join(out_dir, "meta", cid)
-    data_tar = op.join(out_dir, "archive", "{}_data.{}".format(cid, fmt))
-    meta_tar = op.join(out_dir, "archive", "{}_meta.{}".format(cid, fmt))
+    data_tar = op.join(out_dir, "{}_data.{}".format(cid, fmt))
+    meta_tar = op.join(out_dir, "{}_meta.{}".format(cid, fmt))
 
     t1 = time.time()
     print("Compressing...")
