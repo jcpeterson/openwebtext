@@ -86,8 +86,8 @@ def download(
 
     if save_uncompressed:
         month = extract_month(args.url_file)
-        data_dir = mkdir(op.join(args.out_dir, "data", month))
-        meta_dir = mkdir(op.join(args.out_dir, "meta", month))
+        data_dir = mkdir(op.join(args.output_dir, "data", month))
+        meta_dir = mkdir(op.join(args.output_dir, "meta", month))
         text_fp = op.join(data_dir, "{}.txt".format(fid))
         meta_fp = op.join(meta_dir, "{}.json".format(fid))
 

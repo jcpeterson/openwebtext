@@ -1,7 +1,7 @@
 # OpenWebText
 Open clone of OpenAI's unreleased WebText dataset scraper (started via [this reddit post](https://www.reddit.com/r/MachineLearning/comments/aqzjv1/d_open_alternative_reddit_scraper_inspired_by/)). It mines URLs from pre-downloaded (monthly) pushshift.io submission dumps instead of the API for speed.
 
-Currently, only the 3+ karma links (30 million from 2006-2018 posts) are available for download [here](https://mega.nz/fm/9BRTBABA) (2GB uncompressed down from the approximately 150GB total set of compressed submissions), but the scraped content will be posted very soon. The URLs are already filtered to exclude audio/video/nsfw/etc.
+Currently, only the 3+ karma links (30 million from 2006-2018 posts) are available for download [here](https://mega.nz/#F!EZZD0YwJ!9_PlEQzdMVLaNdKv_ICNVQ) (2GB uncompressed down from the approximately 150GB total set of compressed submissions), but the scraped content will be posted very soon. The URLs are already filtered to exclude audio/video/nsfw/etc.
 
 Original OpenAI project links:
 * Blog Post [(Better Language Models and Their Implications)](https://blog.openai.com/better-language-models/)
