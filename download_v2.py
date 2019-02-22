@@ -13,7 +13,7 @@ from multiprocessing import Pool
 # for backward compatibility
 from six.moves.urllib.request import urlopen
 
-from scrapers import bs4_scraper, newspaper_scraper, raw_scraper
+from scrapers_v2 import bs4_scraper, newspaper_scraper, raw_scraper
 
 parser = argparse.ArgumentParser()
 parser.add_argument("url_file", type=str)
