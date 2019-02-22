@@ -97,7 +97,7 @@ def download(
     elif scraper == "raw":
         scrape = raw_scraper
 
-    text, meta = scrape(url)
+    text, meta = scrape(url, memoize)
     if text is None or text.strip() == "":
         return
 
