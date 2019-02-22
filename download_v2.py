@@ -104,14 +104,14 @@ def archive_chunk(month, cid, cdata, out_dir, fmt):
         raise Exception('Compression format must be "xz", "bz2", or "gz"')
 
     mkdir(out_dir)
-    text, meta, fid, uid = zip(*cdata)
+    texts, metas, fids, uids = zip(*cdata)
     data_tar = op.join(out_dir, "{}-{}_data.{}".format(month, cid, fmt))
     meta_tar = op.join(out_dir, "{}-{}_meta.{}".format(month, cid, fmt))
-    tar_fps, texts, exts = [data_tar, meta_tar], [text, meta], ["txt", "json"]
+    tar_fps, texts, exts = [data_tar, meta_tar], [texts, metas], ["txt", "json"]
 
     for tar_fp, txts, ext in zip(tar_fps, texts, exts):
         with tarfile.open(tar_fp, "w:" + fmt) as tar:
-            for f in txts:
+            for f, fid in zip(txts, fids):
                 if f == "":
                     continue
 
