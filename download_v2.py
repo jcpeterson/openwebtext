@@ -1,50 +1,98 @@
 from __future__ import print_function
 
-import os, io, argparse, time, json, tarfile, warnings
+import io
+import time
+import json
+import tarfile
+import warnings
+import argparse
 import os.path as op
 from glob import glob
 from hashlib import md5
-
 import multiprocessing as mpl
 
 # for backward compatibility
 from six.moves.urllib.request import urlopen
 
+from utils import mkdir, chunks, extract_month
 from scrapers import bs4_scraper, newspaper_scraper, raw_scraper
-
-import newspaper
 
 parser = argparse.ArgumentParser()
 parser.add_argument("url_file", type=str)
-parser.add_argument("--save_uncompressed", action="store_true", default=False,
-    help="whether to save the raw txt files to disk")
-parser.add_argument("--output_dir", type=str, default="scraped",
-    help="which folder in the working directory to use for output")
-parser.add_argument("--n_procs", type=int, default=1,
-    help="how many processes (cores) to use for parallel scraping")
-parser.add_argument("--timeout", type=int, default=-1,
-    help="maximum scrape time for a single URL; -1 means no limit")
-parser.add_argument("--max_urls", type=int, default=-1,
-    help="maximum # of URLs to scrape; mostly for debugging")
-parser.add_argument("--chunk_size", type=int, default=100,
-    help="how many URLs to scrape before saving to archive")
-parser.add_argument("--scraper", type=str, default="newspaper",
-    choices=["raw","bs4","newspaper"],
-    help="which text/content scraper to use; raw is html")
-parser.add_argument("--compress", action="store_true", default=False,
-    help="whether to output scraped content as compressed archives")
-parser.add_argument("--compress_fmt", type=str, default="xz",
+parser.add_argument(
+    "--save_uncompressed",
+    action="store_true",
+    default=False,
+    help="whether to save the raw txt files to disk",
+)
+parser.add_argument(
+    "--output_dir",
+    type=str,
+    default="scraped",
+    help="which folder in the working directory to use for output",
+)
+parser.add_argument(
+    "--n_procs",
+    type=int,
+    default=1,
+    help="how many processes (cores) to use for parallel scraping",
+)
+parser.add_argument(
+    "--timeout",
+    type=int,
+    default=-1,
+    help="maximum scrape time for a single URL; -1 means no limit",
+)
+parser.add_argument(
+    "--max_urls",
+    type=int,
+    default=-1,
+    help="maximum # of URLs to scrape; mostly for debugging",
+)
+parser.add_argument(
+    "--chunk_size",
+    type=int,
+    default=100,
+    help="how many URLs to scrape before saving to archive",
+)
+parser.add_argument(
+    "--scraper",
+    type=str,
+    default="newspaper",
+    choices=["raw", "bs4", "newspaper"],
+    help="which text/content scraper to use; raw is html",
+)
+parser.add_argument(
+    "--compress",
+    action="store_true",
+    default=False,
+    help="whether to output scraped content as compressed archives",
+)
+parser.add_argument(
+    "--compress_fmt",
+    type=str,
+    default="xz",
     choices=["xz", "bz2", "gz"],
-    help="which archive format to use")
-parser.add_argument("--scraper_memoize", action="store_true", default=False,
-    help="whether to use cache for newspaper")
-parser.add_argument("--show_warnings", action="store_true", default=False,
-    help="whether to show warnings in general during scraping")
+    help="which archive format to use",
+)
+parser.add_argument(
+    "--scraper_memoize",
+    action="store_true",
+    default=False,
+    help="whether to use cache for newspaper",
+)
+parser.add_argument(
+    "--show_warnings",
+    action="store_true",
+    default=False,
+    help="whether to show warnings in general during scraping",
+)
 args = parser.parse_args()
 
 if not args.show_warnings:
     # avoid lots of datetime warnings
     warnings.filterwarnings("ignore")
+
 
 def load_urls(url_file, completed_fids, max_urls=-1):
     with open(url_file) as fh:
@@ -116,14 +164,14 @@ def download(
 
 
 def archive_chunk(month, cid, cdata, out_dir, fmt):
-
     mkdir(out_dir)
     texts, metas, fids, uids = zip(*cdata)
+
     data_tar = op.join(out_dir, "{}-{}_data.{}".format(month, cid, fmt))
     meta_tar = op.join(out_dir, "{}-{}_meta.{}".format(month, cid, fmt))
     tar_fps, texts, exts = [data_tar, meta_tar], [texts, metas], ["txt", "json"]
 
-    doc_count = 0 # to count how many non-empty docs
+    doc_count = 0
     docs_counted = False
     for tar_fp, txts, ext in zip(tar_fps, texts, exts):
         with tarfile.open(tar_fp, "w:" + fmt) as tar:
@@ -151,31 +199,6 @@ def archive_chunk(month, cid, cdata, out_dir, fmt):
 #######################################################################
 
 
-def extract_archive(archive_fp, outdir="."):
-    with tarfile.open(archive_fp, "r") as tar:
-        tar.extractall(outdir)
-    return outdir
-
-
-def chunks(l, n):
-    """Yield successive n-sized chunks from l."""
-    for i in range(0, len(l), n):
-        yield l[i : i + n]
-
-
-def mkdir(fp):
-    if not op.exists(fp):
-        os.makedirs(fp)
-    return fp
-
-
-def extract_month(url_file):
-    month = op.split(url_file)[-1]
-    for fmt in [".bz2", ".xz", ".gz"]:
-        month = month[: month.find(fmt)] if fmt in month else month
-    return month
-
-
 def get_state(month, out_dir):
     mkdir("state")
     latest_cid = 0
@@ -189,7 +212,7 @@ def get_state(month, out_dir):
     return completed_uids, state_fp, latest_cid
 
 
-def log_state(state_fp, cdata):
+def set_state(state_fp, cdata):
     _, _, _, uids = zip(*cdata)
     with open(state_fp, "a+") as handle:
         for uid in uids:
@@ -198,8 +221,10 @@ def log_state(state_fp, cdata):
 
 if __name__ == "__main__":
     month = extract_month(args.url_file)
+
     # in case we are resuming from a previous run
     completed_uids, state_fp, prev_cid = get_state(month, args.output_dir)
+
     # URLs we haven't scraped yet (if first run, all URLs in file)
     url_entries = load_urls(args.url_file, completed_uids, args.max_urls)
 
@@ -224,20 +249,21 @@ if __name__ == "__main__":
                 try:
                     result = chunk_iter.next(timeout=args.timeout)
                     cdata.append(result)
-                except mpl.TimeoutError as e:
-                    print('   --- Timeout Error ---   ')
+                except mpl.TimeoutError:
+                    print("   --- Timeout Error ---   ")
         else:
             cdata = list(pool.imap(download, chunk, chunksize=1))
-        log_state(state_fp, cdata)
-        print("{} out of {} downloads timed out".format(len(chunk)-len(cdata), len(chunk)))
+
+        set_state(state_fp, cdata)
+        print("{} / {} downloads timed out".format(len(chunk) - len(cdata), len(chunk)))
         print("Chunk time: {} seconds".format(time.time() - t1))
 
         # archive and save this chunk to file
         if args.compress:
             print("Compressing...")
             t2 = time.time()
-            doc_count = archive_chunk(month, cid, cdata, args.output_dir, args.compress_fmt)
+            count = archive_chunk(month, cid, cdata, args.output_dir, args.compress_fmt)
             print("Archive created in {} seconds".format(time.time() - t2))
-            print("{} out of {} URLs yielded content\n".format(doc_count, len(chunk)))
+            print("{} out of {} URLs yielded content\n".format(count, len(chunk)))
 
     print("Done!")
