@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import io
-import os
 import time
 import json
 import tarfile
@@ -15,6 +14,7 @@ from multiprocessing import Pool
 # for backward compatibility
 from six.moves.urllib.request import urlopen
 
+from utils import mkdir, chunks, extract_month
 from scrapers import bs4_scraper, newspaper_scraper, raw_scraper
 
 parser = argparse.ArgumentParser()
@@ -132,31 +132,6 @@ def archive_chunk(month, cid, cdata, out_dir, fmt):
 #######################################################################
 
 
-def extract_archive(archive_fp, outdir="."):
-    with tarfile.open(archive_fp, "r") as tar:
-        tar.extractall(outdir)
-    return outdir
-
-
-def chunks(l, n):
-    """Yield successive n-sized chunks from l."""
-    for i in range(0, len(l), n):
-        yield l[i : i + n]
-
-
-def mkdir(fp):
-    if not op.exists(fp):
-        os.makedirs(fp)
-    return fp
-
-
-def extract_month(url_file):
-    month = op.split(url_file)[-1]
-    for fmt in [".bz2", ".xz", ".gz"]:
-        month = month[: month.find(fmt)] if fmt in month else month
-    return month
-
-
 def get_state(month, out_dir):
     mkdir("state")
     latest_cid = 0
@@ -170,7 +145,7 @@ def get_state(month, out_dir):
     return completed_uids, state_fp, latest_cid
 
 
-def log_state(state_fp, cdata):
+def set_state(state_fp, cdata):
     _, _, _, uids = zip(*cdata)
     with open(state_fp, "a+") as handle:
         for uid in uids:
@@ -188,7 +163,7 @@ if __name__ == "__main__":
         print("Downloading chunk {}".format(cid))
         t1 = time.time()
         cdata = list(p.imap(download, chunk))
-        log_state(state_fp, cdata)
+        set_state(state_fp, cdata)
         print("Chunk time: {} seconds".format(time.time() - t1))
 
         if args.compress:
