@@ -4,10 +4,6 @@
 
 Open clone of [OpenAI's unreleased WebText dataset](https://blog.openai.com/better-language-models/) scraper (started via [this reddit post](https://www.reddit.com/r/MachineLearning/comments/aqzjv1/d_open_alternative_reddit_scraper_inspired_by/)). It mines URLs from pre-downloaded (monthly) pushshift.io submission dumps instead of the API for speed.
 
-All scraped data can currently be found [here](https://mega.nz/#F!EZZD0YwJ!9_PlEQzdMVLaNdKv_ICNVQ). 
-* The URLs folder contains text dumps of all outbound reddit links with at least 3 karma (NSFW currently not included). After removal of non-html files/media and URL de-duplication, there are just over 23 million links spanning 2005 to 2018, a reduction from 150GB in the original pushdump archives to 2GB.
-* The HTML folder contains most of the raw html downloads from each of the links above with style and script tags removed. The rest of this data is currently being uploaded.
-
 Original OpenAI project links:
 * Blog Post [(Better Language Models and Their Implications)](https://blog.openai.com/better-language-models/)
 * Paper [(Language Models are Unsupervised Multitask Learners)](https://d4mucfpksywv.cloudfront.net/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
