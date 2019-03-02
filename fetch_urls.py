@@ -1,16 +1,18 @@
+"""Tool for fetching URLs from pushshift.io."""
+
 # Import dependencies
+import os
 from urllib import request as req
 import re
 import pycurl
-import os
 
 # Define values
 BASE_URL = "https://files.pushshift.io/reddit/submissions" # No trailing slash
-LINK_RE_PATTERN = "<a\s.*href=[\"'](\S+)[\"'][^>]*>\S*<\/a>"
+LINK_RE_PATTERN = r"<a\s.*href=[\"'](\S+)[\"'][^>]*>\S*<\/a>"
 OUTPUT_DIR = "pushshift_dumps_full"
 
 # Define functions
-def main(*args, **kwargs):
+def main():
     """The main entrypoint."""
 
     # Get links
