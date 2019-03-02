@@ -27,4 +27,4 @@ tinysegmenter==0.3
 tldextract==2.2.0
 urllib3==1.24.1
 urlparse2==1.1.1
---install-option="--with-openssl" --install-option="--openssl-dir=/usr/local/opt/openssl" pycurl==7.21.5
+pycurl==7.21.5
