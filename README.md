@@ -4,7 +4,7 @@
 
 Open clone of OpenAI's unreleased WebText dataset ([blog](https://blog.openai.com/better-language-models/), [paper](https://d4mucfpksywv.cloudfront.net/better-language-models/language_models_are_unsupervised_multitask_learners.pdf), [code](https://github.com/openai/gpt-2)) scraper used to train GPT-2. The project was started via [this reddit post](https://www.reddit.com/r/MachineLearning/comments/aqzjv1/d_open_alternative_reddit_scraper_inspired_by/). The current result is just over 23 million URLs and over 10 million HTML pages.
 
-This implementation mines and intelligently de-duplicates +3 karma URLs from pre-downloaded (monthly) pushshift.io Reddit submission dumps (which is much faster than making successive calls to the web API), downloads raw HTML, and extracts text. There's also an initial utility for tokenizing and we are looking to add BPE encoding soon. This code base is functional but in active development so please feel free to post issues or suggest improvements (pull requests welcome).
+This implementation mines and intelligently de-duplicates +3 karma URLs from pre-downloaded (monthly) pushshift.io Reddit submission dumps (which is much faster than making successive calls to the web API), downloads raw HTML, and extracts text. To save time, you can use the pre-filtered URL lists [here](https://mega.nz/#F!EZZD0YwJ!9_PlEQzdMVLaNdKv_ICNVQ), which reduce the 140GB of pushshift data to down to the 2GB of URLs actually needed for content scraping. There's also an initial utility for tokenizing and we are looking to add BPE encoding soon. This code base is functional but in active development so please feel free to post issues or suggest improvements (pull requests welcome).
 
 ### Dependencies
 If you use pipenv (`pip install --user pipenv`), cd to the project root and run
@@ -18,7 +18,7 @@ pip3 install -r requirements.txt
 ```
 
 ### To Extract/Clean URLs Yourself
-Pushshift dumps must be downloaded from [here](https://files.pushshift.io/reddit/submissions/) (auto-downloader to be added soon). Two examples are included in the repo in the "pushshift_dumps" folder. Then, extract good URLs using:
+You can download the pre-filtered URLs [here](https://mega.nz/#F!EZZD0YwJ!9_PlEQzdMVLaNdKv_ICNVQ), but if you want to re-filter them yourself, perhaps with different filtering criteria, follow these instructions. Pushshift dumps must first be downloaded using `fetch_urls.py` (thanks to [simonfall](https://github.com/simonfall)), or manually from [here](https://files.pushshift.io/reddit/submissions/). Two example dumps are included in the repo in the "pushshift_dumps" folder. Next, extract good URLs using:
 ```
 python extract_urls.py --single_file RS_v2_2005-06.xz
 ```
