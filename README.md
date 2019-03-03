@@ -36,18 +36,20 @@ python deduplicate_urls.py --input_dir url_dumps
 ```
 The output of both `extract_urls.py` and `deduplicate_urls.py` are text files given that all 23 million "good" URLs only comprise 2GB.
 
-### To Scrape HTML
+### To Scrape HTML (or Text Directly)
 This is done one month at a time given the compute/bandwidth required. `n_procs` is the number of cores to use for parallelization and should be at least `20-40` for fastest results. The script will output results in chunks of size `chunk_size`. If `timeout` is not set, or is set to `-1`, the downloader may hang on large files.
+
+To scrape raw HTML for later processing and text extraction, set `--scraper` to `raw` as shown below. The downloaded HTML is stripped of script/style tags and stored in compressed archives using LZMA compression, along with a small amount of meta.
 ```
 python download.py url_dumps_deduped/RS_20XX-XX.xz.deduped.txt --n_procs 100 --scraper raw --chunk_size 100000 --compress --timeout 30
 ```
-The downloaded HTML is stripped of script/style tags and stored in compressed archives using LZMA compression, along with a small amount of meta.
+To scrape text content directly and save disk space (but without the option to re-extract with different parameters later), set `--scraper` to `newspaper` to extract text using the Python [newspaper](https://github.com/codelucas/newspaper) package. For more careful extraction, set `--scraper` to `bs4` ([Beautiful Soup 4](https://www.crummy.com/software/BeautifulSoup/bs4/doc/)), which will extact text for all `<p>` tags on the page.
 
-### To Extract Text from HTML
+### To Extract Text from HTML (After Download)
 ```
 python extract_text.py scraped/RS_20XX-XX-X_data.xz --n_procs 100 
 ```
-This currently outputs txt files.
+This currently uses [newspaper](https://github.com/codelucas/newspaper) and outputs txt files.
 
 ### Tokenization
 The original WebText didn't use tokenization, but if you need it use:
