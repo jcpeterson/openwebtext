@@ -40,9 +40,15 @@ def raw_scraper(url, memoize):
         html = cleaner.clean_html(html)
         article.parse()
     except:
-        return None, None
+        return None, {
+            "url": url,
+            "scraper": "raw",
+        }
     if article.text == "":
-        return None, None
+        return None, {
+            "url": url,
+            "scraper": "raw",
+        }
 
     metadata = {"url": url, "elapsed": time.time() - t1, "scraper": "raw"}
     return html, metadata
@@ -58,7 +64,10 @@ def newspaper_scraper(url, memoize):
         text = article.text
         count = len(text.split())
     except:
-        return None, None
+        return None, {
+            "url": url,
+            "scraper": "newspaper",
+        }
 
     metadata = {
         "url": url,
@@ -82,7 +91,10 @@ def bs4_scraper(url, memoize):
         # newspaper_scraper
         text = " ".join(text)
     except:
-        return None, None
+        return None, {
+            "url": url,
+            "scraper": "bs4",
+        }
 
     metadata = {
         "url": url,
