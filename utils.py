@@ -25,5 +25,5 @@ def extract_archive(archive_fp, outdir="."):
 
 def mkdir(fp):
     if not op.exists(fp):
-        os.makedirs(fp)
+        os.makedirs(fp, exist_ok=True)
     return fp
