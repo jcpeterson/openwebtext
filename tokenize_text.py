@@ -9,29 +9,38 @@ from pytorch_pretrained_bert import GPT2Tokenizer
 import numpy as np
 from multiprocessing import Pool, current_process
 from functools import partial
+import itertools
 
-
-def batch_iter(l, bs):
-    chunks = (len(l) - 1) // bs + 1
-    for i in range(chunks):
-        yield l[i*bs:(i+1)*bs]
+def every(it, n):
+    """every(ABCDEFG, 2) --> AB CD EF G"""                                      
+    toexit = False
+    while not toexit:
+        batch = []
+        for i in range(n):
+            try:
+                batch.append(next(it))
+            except StopIteration:
+                toexit = True
+        if not batch:
+            break
+        yield batch
 
 
 def tokenizeGpt2Spawn(args, nproc=None, **kwargs):
     # Make sure output dir exists.
     if not os.path.exists(args.output_dir):
         os.mkdir(args.output_dir)
-    extraction_file_paths = glob.glob(args.input_glob)
-
+    extraction_file_paths = glob.iglob(args.input_glob)
     if nproc == 1:
-        print(tokenizeGpt2(extraction_file_paths, args, **kwargs))
+        for batch in every(extraction_file_paths, 6):
+            print(tokenizeGpt2(batch, args, **kwargs))
         return
     with Pool() as pool:
-        omitted_files = pool.imap_unordered(
+        out = pool.imap_unordered(
             partial(tokenizeGpt2, args=args, **kwargs),
-            batch_iter(extraction_file_paths, len(extraction_file_paths)//pool._processes))
-        print(
-            f'Skipped {sum(omitted_files)}/{len(extraction_file_paths)} files')
+            every(extraction_file_paths, args.file_bs))
+        omitted, total = zip(*out)
+        print(f'\n\nSkipped {sum(omitted)}/{sum(total)} files')
 
 
 def tokenizeGpt2(extraction_file_paths, args, min_length=20):
@@ -41,13 +50,13 @@ def tokenizeGpt2(extraction_file_paths, args, min_length=20):
     Omit files smaller than min_length tokens, which  are likely low quality.
     """
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-
     EOT = tokenizer.encoder['<|endoftext|>']
     omitted_files = 0
     combined = []
     p = current_process()
-    index = p._identity[0]
-    for extraction_file_path in tqdm.tqdm(extraction_file_paths, position=index, desc=f'proc {index}'):
+    index = p._identity[0] if p._identity else 0
+    bar = tqdm.tqdm(extraction_file_paths, position=index, desc=f'proc {index}')
+    for extraction_file_path in bar:
         _, filename = os.path.split(extraction_file_path)
         text_file = os.path.join(
             args.output_dir, filename.replace('.txt', '.tokenized.npz'))
@@ -67,7 +76,7 @@ def tokenizeGpt2(extraction_file_paths, args, min_length=20):
     if combined:
         np.savez_compressed(text_file, combined)
 
-    return omitted_files
+    return omitted_files, bar.total
 
 
 def tokenizeSpacy(args):
@@ -104,7 +113,9 @@ if __name__ == '__main__':
     parser.add_argument('--output_dir', type=str, default='tokenized')
     parser.add_argument('--tokenizer', type=str,
                         default='spacy', choices=['spacy', 'gpt2'])
-    parser.add_argument('--combine', type=int, default=1e7, help="min tokens per file in gpt2 mode")
+    parser.add_argument('--combine', type=int, default=1e8, help="min tokens per file in gpt2 mode")
+    parser.add_argument('--file_bs', type=int, default=10000, help="files per batch in gpt2 mode")
+
     args = parser.parse_args()
 
     if args.tokenizer == 'spacy':
