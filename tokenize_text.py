@@ -7,7 +7,7 @@ import tqdm
 import contextlib
 from pytorch_pretrained_bert import GPT2Tokenizer
 import numpy as np
-from multiprocessing import Pool
+from multiprocessing import Pool, current_process
 from functools import partial
 
 
@@ -27,19 +27,14 @@ def tokenizeGpt2Spawn(args, nproc=None, **kwargs):
         print(tokenizeGpt2(extraction_file_paths, args, **kwargs))
         return
     with Pool() as pool:
-        omitted_files = 0
-        tqdm_bar = tqdm.tqdm(pool.imap_unordered(
+        omitted_files = pool.imap_unordered(
             partial(tokenizeGpt2, args=args, **kwargs),
-            batch_iter(extraction_file_paths, len(extraction_file_paths)//pool._processes)),
-            total=len(extraction_file_paths))
-        for o in tqdm_bar:
-            omitted_files += o
-            tqdm_bar.set_description(f'omit: {omitted_files}')
+            batch_iter(extraction_file_paths, len(extraction_file_paths)//pool._processes))
         print(
-            f'Tokenized {tqdm_bar.total - omitted_files}/{tqdm_bar.total} files')
+            f'Skipped {sum(omitted_files)}/{len(extraction_file_paths)} files')
 
 
-def tokenizeGpt2(extraction_file_paths, args, min_length=20, combine=100000):
+def tokenizeGpt2(extraction_file_paths, args, min_length=20):
     """Tokenize text using GPT-2's pretrained BPE encoder.
 
     Saves as compressed npz files that can be loaded using `with np.load('filename.npz') as a: a['arr_0']`.
@@ -50,7 +45,9 @@ def tokenizeGpt2(extraction_file_paths, args, min_length=20, combine=100000):
     EOT = tokenizer.encoder['<|endoftext|>']
     omitted_files = 0
     combined = []
-    for extraction_file_path in extraction_file_paths:
+    p = current_process()
+    index = p._identity[0]
+    for extraction_file_path in tqdm.tqdm(extraction_file_paths, position=index, desc=f'proc {index}'):
         _, filename = os.path.split(extraction_file_path)
         text_file = os.path.join(
             args.output_dir, filename.replace('.txt', '.tokenized.npz'))
@@ -63,7 +60,7 @@ def tokenizeGpt2(extraction_file_paths, args, min_length=20, combine=100000):
                 omitted_files += 1
                 continue
             combined += out
-        if len(combined) > combine:
+        if len(combined) > args.combine:
             np.savez_compressed(text_file, combined)
             combined = []
     # Save the rest.
@@ -107,6 +104,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_dir', type=str, default='tokenized')
     parser.add_argument('--tokenizer', type=str,
                         default='spacy', choices=['spacy', 'gpt2'])
+    parser.add_argument('--combine', type=int, default=1e7, help="min tokens per file in gpt2 mode")
     args = parser.parse_args()
 
     if args.tokenizer == 'spacy':
