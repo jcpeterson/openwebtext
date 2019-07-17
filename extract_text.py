@@ -47,7 +47,9 @@ def parse_archive(archive_fp, out_dir, n_procs, chunk_size=100):
     tmp_data_dir = pl.Path(archive_fp).with_suffix(".tmp")
 
     # extract tar first
-    if not tmp_data_dir.exists():
+    if tmp_data_dir.exists():
+        raise FileExistsError("Trying to extract archive to {}".format(tmp_data_dir))
+    else:
         tar = tarfile.open(archive_fp)
         tar.extractall(tmp_data_dir)
         tar.close()
@@ -75,6 +77,12 @@ def parse_archive(archive_fp, out_dir, n_procs, chunk_size=100):
             save_parsed_file(filename, text, out_dir)
     print("Could not parse {} files".format(unparsable))
 
+    # remove the extracted files
+    for filename in tmp_data_dir.iterdir():
+        if filename.is_file():
+            filename.unlink()
+    # and then the now (hopefully) empty directory
+    tmp_data_dir.rmdir()
 
 if __name__ == "__main__":
     month = extract_month(args.html_archive)
