@@ -66,23 +66,13 @@ def parse_archive(archive_fp, out_dir, n_procs, chunk_size=100):
     out_dir = pl.Path(out_dir)
     unparsable = 0
 
-    if n_procs == 1:
-        for filename in tqdm(file_gen(), total=num_remaining_files):
-            filename, text = parse_file(filename)
-
+    with mpl.Pool(n_procs) as pool:
+        for filename, text in tqdm(pool.imap(parse_file, file_gen(), chunksize=chunk_size), total=num_remaining_files):
             if not text:
                 unparsable += 1
                 continue
 
             save_parsed_file(filename, text, out_dir)
-    else:
-        with mpl.Pool(n_procs) as pool:
-            for filename, text in tqdm(pool.imap(parse_file, file_gen(), chunksize=chunk_size), total=num_remaining_files):
-                if not text:
-                    unparsable += 1
-                    continue
-
-                save_parsed_file(filename, text, out_dir)
     print("Could not parse {} files".format(unparsable))
 
 
