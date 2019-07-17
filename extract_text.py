@@ -4,10 +4,12 @@ from __future__ import division
 from glob import glob
 import os.path as op
 import argparse, time, tarfile
-import multiprocessing as mpl
 from hashlib import md5
+import multiprocessing as mpl
+import pathlib as pl
 
 import newspaper
+from tqdm import tqdm
 
 from utils import mkdir, chunks, extract_month
 
@@ -19,20 +21,20 @@ parser.add_argument("--output_dir", type=str, default="parsed")
 args = parser.parse_args()
 
 
-def parse_file(file_entry):
-    file_name, html = file_entry
-    url_hash = md5(html).hexdigest()
-    article = newspaper.Article(url=url_hash, fetch_images=False)
-    article.set_html(html)
-    article.parse()
-    return (file_name, article.text)
+def parse_file(filename):
+    with open(filename, "rt") as f:
+        html = f.read()
+        url_hash = md5(html.encode("utf-8")).hexdigest()
+        article = newspaper.Article(url=url_hash, fetch_images=False)
+        article.set_html(html)
+        article.parse()
+        return filename, article.text
 
 
-def save_parsed_text(parsed_entries, out_dir):
-    for fn, txt in parsed_entries:
-        txt_fp = op.join(out_dir, fn)
-        with open(txt_fp, "w") as handle:
-            handle.write(txt)
+def save_parsed_file(filename, text, out_dir):
+    txt_fp = out_dir / filename.name
+    with open(txt_fp, "wt") as handle:
+        handle.write(text)
 
 
 def get_processed_files(out_dir):
@@ -41,33 +43,47 @@ def get_processed_files(out_dir):
 
 
 def parse_archive(archive_fp, out_dir, n_procs, chunk_size=100):
-    processed = get_processed_files(out_dir)
-    with tarfile.open(archive_fp, "r") as tf:
-        files = list(set(tf.getnames()) - set(processed))
-        if len(files) == 0:
-            return
+    tmp_data_dir = pl.Path(archive_fp).with_suffix(".tmp")
+    
+    # extract tar first
+    if not tmp_data_dir.exists():
+        tar = tarfile.open(archive_fp)
+        tar.extractall(tmp_data_dir)
+        tar.close()
+    
 
-        if len(processed) > 0:
-            print("{} files already processed.".format(len(processed)))
+    processed_files = set(get_processed_files(out_dir))
+    num_total_files = len([_ for _ in tmp_data_dir.iterdir()])
+    num_remaining_files = num_total_files - len(processed_files)
+    print("{}/{} files already processed.".format(len(processed_files), num_total_files))
+    
+    def file_gen():
+        for filename in tmp_data_dir.iterdir():
+            if filename.name not in processed_files and filename.is_file():
+                yield filename
+    
+    out_dir = pl.Path(out_dir) 
+    unparsable = 0
 
-        pool = mpl.Pool(n_procs)
-        for ci, chunk in enumerate(chunks(files, chunk_size)):
-            file_entries = [(fn, tf.extractfile(fn).read()) for fn in chunk]
+    if n_procs == 1:
+        for filename in tqdm(file_gen(), total=num_remaining_files):
+            filename, text = parse_file(filename)
 
-            t1 = time.time()
-            parsed = list(pool.imap(parse_file, file_entries, chunksize=1))
+            if not text:
+                unparsable += 1
+                continue
 
-            # remove empty strings from output
-            parsed = [p for p in parsed if len(p[1]) != 0]
+            save_parsed_file(filename, text, out_dir)
+    else:
+        with mpl.Pool(n_procs) as pool:
+            for filename, text in tqdm(pool.imap(parse_file, file_gen(), chunksize=chunk_size), total=num_remaining_files):
+                if not text:
+                    unparsable += 1
+                    continue
 
-            hit_rate = len(parsed) / len(chunk) * 100
-            print("Parsing chunk {} took {} seconds".format(ci + 1, time.time() - t1))
-            print(" -- {}% of chunk {}'s docs yielded text.".format(hit_rate, ci + 1))
-
-            t1 = time.time()
-            save_parsed_text(parsed, out_dir)
-            print("Saving chunk {} took {} seconds".format(ci + 1, time.time() - t1))
-
+                save_parsed_file(filename, text, out_dir)
+    print("Could not parse {} files".format(unparsable))
+    
 
 if __name__ == "__main__":
     month = extract_month(args.html_archive)
