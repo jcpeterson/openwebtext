@@ -1,6 +1,6 @@
 # OpenWebText
 
-[Joshua Peterson](http://joshpeterson.io), [Stephan Meylan](https://stephanmeylan.com), & [David Bourgin](https://http://dvaidbourign.com)
+[Joshua Peterson](https://twitter.com/joshuacpeterson), [Stephan Meylan](https://stephanmeylan.com), & [David Bourgin](https://http://dvaidbourign.com)
 
 Open clone of OpenAI's unreleased WebText dataset ([blog](https://blog.openai.com/better-language-models/), [paper](https://d4mucfpksywv.cloudfront.net/better-language-models/language_models_are_unsupervised_multitask_learners.pdf), [code](https://github.com/openai/gpt-2)) scraper used to train GPT-2. The project was started via [this reddit post](https://www.reddit.com/r/MachineLearning/comments/aqzjv1/d_open_alternative_reddit_scraper_inspired_by/). The current result is just over 23 million URLs and over 10 million HTML pages.
 
