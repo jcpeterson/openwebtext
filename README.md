@@ -47,7 +47,7 @@ To scrape text content directly and save disk space (but without the option to r
 
 ### To Extract Text from HTML (After Download)
 ```
-python extract_text.py scraped/RS_20XX-XX-X_data.xz --n_procs 100 
+python extract_text.py --html_archive scraped/RS_20XX-XX-X_data.xz --n_procs 100 
 ```
 This currently uses [newspaper](https://github.com/codelucas/newspaper) and outputs txt files.
 
