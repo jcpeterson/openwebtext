@@ -1,15 +1,18 @@
 from __future__ import print_function
 from __future__ import division
 
-from glob import glob
-import os.path as op
 import argparse, time, tarfile
-import multiprocessing as mpl
+from glob import glob
 from hashlib import md5
+import multiprocessing as mpl
+import os.path as op
+import pathlib as pl
 
 import newspaper
+from tqdm import tqdm
 
 from utils import mkdir, chunks, extract_month
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--html_archive", type=str, default="scraped/RS_2017-04-4_data.xz")
@@ -19,20 +22,20 @@ parser.add_argument("--output_dir", type=str, default="parsed")
 args = parser.parse_args()
 
 
-def parse_file(file_entry):
-    file_name, html = file_entry
-    url_hash = md5(html).hexdigest()
-    article = newspaper.Article(url=url_hash, fetch_images=False)
-    article.set_html(html)
-    article.parse()
-    return (file_name, article.text)
+def parse_file(filename):
+    with open(filename, "rt") as f:
+        html = f.read()
+        url_hash = md5(html.encode("utf-8")).hexdigest()
+        article = newspaper.Article(url=url_hash, fetch_images=False)
+        article.set_html(html)
+        article.parse()
+        return filename, article.text
 
 
-def save_parsed_text(parsed_entries, out_dir):
-    for fn, txt in parsed_entries:
-        txt_fp = op.join(out_dir, fn)
-        with open(txt_fp, "w") as handle:
-            handle.write(txt)
+def save_parsed_file(filename, text, out_dir):
+    txt_fp = out_dir / filename.name
+    with open(txt_fp, "wt") as handle:
+        handle.write(text)
 
 
 def get_processed_files(out_dir):
@@ -41,33 +44,45 @@ def get_processed_files(out_dir):
 
 
 def parse_archive(archive_fp, out_dir, n_procs, chunk_size=100):
-    processed = get_processed_files(out_dir)
-    with tarfile.open(archive_fp, "r") as tf:
-        files = list(set(tf.getnames()) - set(processed))
-        if len(files) == 0:
-            return
+    tmp_data_dir = pl.Path(archive_fp).with_suffix(".tmp")
 
-        if len(processed) > 0:
-            print("{} files already processed.".format(len(processed)))
+    # extract tar first
+    if tmp_data_dir.exists():
+        raise FileExistsError("Trying to extract archive to {}".format(tmp_data_dir))
+    else:
+        tar = tarfile.open(archive_fp)
+        tar.extractall(tmp_data_dir)
+        tar.close()
 
-        pool = mpl.Pool(n_procs)
-        for ci, chunk in enumerate(chunks(files, chunk_size)):
-            file_entries = [(fn, tf.extractfile(fn).read()) for fn in chunk]
+    # get files to process
+    processed_files = set(get_processed_files(out_dir))
+    num_total_files = len([_ for _ in tmp_data_dir.iterdir()])
+    num_remaining_files = num_total_files - len(processed_files)
+    print("{}/{} files already processed.".format(len(processed_files), num_total_files))
 
-            t1 = time.time()
-            parsed = list(pool.imap(parse_file, file_entries, chunksize=1))
+    def file_gen():
+        for filename in tmp_data_dir.iterdir():
+            if filename.name not in processed_files and filename.is_file():
+                yield filename
 
-            # remove empty strings from output
-            parsed = [p for p in parsed if len(p[1]) != 0]
+    out_dir = pl.Path(out_dir)
+    unparsable = 0
 
-            hit_rate = len(parsed) / len(chunk) * 100
-            print("Parsing chunk {} took {} seconds".format(ci + 1, time.time() - t1))
-            print(" -- {}% of chunk {}'s docs yielded text.".format(hit_rate, ci + 1))
+    with mpl.Pool(n_procs) as pool:
+        for filename, text in tqdm(pool.imap(parse_file, file_gen(), chunksize=chunk_size), total=num_remaining_files):
+            if not text:
+                unparsable += 1
+                continue
 
-            t1 = time.time()
-            save_parsed_text(parsed, out_dir)
-            print("Saving chunk {} took {} seconds".format(ci + 1, time.time() - t1))
+            save_parsed_file(filename, text, out_dir)
+    print("Could not parse {} files".format(unparsable))
 
+    # remove the extracted files
+    for filename in tmp_data_dir.iterdir():
+        if filename.is_file():
+            filename.unlink()
+    # and then the now (hopefully) empty directory
+    tmp_data_dir.rmdir()
 
 if __name__ == "__main__":
     month = extract_month(args.html_archive)
