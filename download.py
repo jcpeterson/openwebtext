@@ -9,7 +9,8 @@ import argparse
 import os.path as op
 from glob import glob
 from hashlib import md5
-import multiprocessing as mpl
+import pebble as pbl
+import concurrent.futures
 
 # for backward compatibility
 from six.moves.urllib.request import urlopen
@@ -95,7 +96,7 @@ if not args.show_warnings:
 
 
 def load_urls(url_file, completed_fids, max_urls=-1):
-    with open(url_file) as fh:
+    with open(url_file, encoding='utf8') as fh:
         url_entries = [
             (fid, url) for (fid, url) in enumerate(fh) if fid not in completed_fids
         ]
@@ -218,6 +219,14 @@ def set_state(state_fp, cdata):
         for uid in uids:
             handle.write("{}\n".format(uid))
 
+def timeout_checker(url_entry,
+    scraper=args.scraper,
+    save_uncompressed=args.save_uncompressed,
+    memoize=args.scraper_memoize):
+    time.sleep(1)
+    return "xyz"
+
+
 
 if __name__ == "__main__":
     month = extract_month(args.url_file)
@@ -228,7 +237,7 @@ if __name__ == "__main__":
     # URLs we haven't scraped yet (if first run, all URLs in file)
     url_entries = load_urls(args.url_file, completed_uids, args.max_urls)
 
-    pool = mpl.Pool(args.n_procs)
+    pool = pbl.ProcessPool(max_workers=args.n_procs)
 
     # process one "chunk" of args.chunk_size URLs at a time
     for i, chunk in enumerate(chunks(url_entries, args.chunk_size)):
@@ -243,16 +252,17 @@ if __name__ == "__main__":
             # for some reason, you CANNOT track j or chunk[j] in the loop,
             # so don't add anything else to the loop below!
             # confusingly, chunksize below is unrelated to our chunk_size
-            chunk_iter = pool.imap_unordered(download, chunk, chunksize=1)
+            #chunk_iter = pool.imap_unordered(timeout_checker, chunk, chunksize=1)
+            chunk_iter = pool.map(download, chunk, chunksize=1,  timeout=args.timeout)
             cdata = []
             for j in range(len(chunk)):
                 try:
-                    result = chunk_iter.next(timeout=args.timeout)
+                    result = next(chunk_iter.result())
                     cdata.append(result)
-                except mpl.TimeoutError:
+                except concurrent.futures.TimeoutError::
                     print("   --- Timeout Error ---   ")
         else:
-            cdata = list(pool.imap(download, chunk, chunksize=1))
+            cdata = list(pool.map(download, chunk, chunksize=1).result())
 
         set_state(state_fp, cdata)
         print("{} / {} downloads timed out".format(len(chunk) - len(cdata), len(chunk)))
