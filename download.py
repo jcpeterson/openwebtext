@@ -259,7 +259,7 @@ if __name__ == "__main__":
                 try:
                     result = next(chunk_iter.result())
                     cdata.append(result)
-                except concurrent.futures.TimeoutError::
+                except concurrent.futures.TimeoutError:
                     print("   --- Timeout Error ---   ")
         else:
             cdata = list(pool.map(download, chunk, chunksize=1).result())
