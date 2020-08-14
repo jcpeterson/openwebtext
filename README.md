@@ -2,7 +2,7 @@
 
 [Joshua Peterson](https://twitter.com/joshuacpeterson), [Stephan Meylan](https://stephanmeylan.com), & [David Bourgin](https://http://dvaidbourign.com)
 
-Open clone of OpenAI's unreleased WebText dataset ([blog](https://blog.openai.com/better-language-models/), [paper](https://d4mucfpksywv.cloudfront.net/better-language-models/language_models_are_unsupervised_multitask_learners.pdf), [code](https://github.com/openai/gpt-2)) scraper used to train GPT-2. The project was started via [this reddit post](https://www.reddit.com/r/MachineLearning/comments/aqzjv1/d_open_alternative_reddit_scraper_inspired_by/). The current result is just over 23 million URLs and over 10 million HTML pages.
+Open clone of OpenAI's unreleased WebText dataset ([blog](https://blog.openai.com/better-language-models/), [paper](https://d4mucfpksywv.cloudfront.net/better-language-models/language_models_are_unsupervised_multitask_learners.pdf), [code](https://github.com/openai/gpt-2)) scraper used to train GPT-2. The current result is just over 23 million URLs and over 10 million HTML pages.
 
 This implementation mines and intelligently de-duplicates +3 karma URLs from pre-downloaded (monthly) pushshift.io Reddit submission dumps (which is much faster than making successive calls to the web API), downloads raw HTML, and extracts text. To save time, you can use the pre-filtered URL lists [here](https://mega.nz/#F!EZZD0YwJ!9_PlEQzdMVLaNdKv_ICNVQ), which reduce the 140GB of pushshift data to down to the 2GB of URLs actually needed for content scraping. There's also an initial utility for tokenizing and we are looking to add BPE encoding soon. This code base is functional but in active development so please feel free to post issues or suggest improvements (pull requests welcome).
 
